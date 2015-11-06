@@ -23,7 +23,7 @@ MODES_items = [
     'description':"POS (and lemmas)",}),
 ('ner',     {'annotators':"tokenize, ssplit, pos, lemma, ner, entitymentions",
     'description':"POS and NER (and lemmas)",}),
-('parse',    {'annotators':"tokenize, ssplit, pos, lemma, parse",
+('parse',    {'annotators':"tokenize, ssplit, pos, lemma, parse, sentiment",
     'description':"fairly basic parsing with POS, lemmas, trees, dependencies",}),
 ('nerparse', {'annotators':"tokenize, ssplit, pos, lemma, ner, entitymentions, parse",
     'description':"parsing with NER, POS, lemmas, depenencies."}),
@@ -171,14 +171,13 @@ class CoreNLP:
         
         cmd = command(**self.__dict__)
         LOG.info("Starting java subprocess, and waiting for signal it's ready, with command: %s" % cmd)
-        self.proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE)
+        self.proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, universal_newlines=True)
         time.sleep(STARTUP_BUSY_WAIT_INTERVAL_SEC)
-
         if self.comm_mode=='SOCKET':
             sock = self.get_socket(num_retries=100, retry_interval=STARTUP_BUSY_WAIT_INTERVAL_SEC)
             sock.close()
         elif self.comm_mode=='PIPE':
-            self.outpipe_fp = open(self.outpipe, 'r')
+            self.outpipe_fp = open(self.outpipe, 'r', encoding='latin-1')
 
         while True:
             # This loop is for if you have timeouts for the socket connection
@@ -191,8 +190,8 @@ class CoreNLP:
                 assert ret == "PONG", "Bad return data on startup ping: " + ret
                 LOG.info("Successful ping. The server has started.")
                 break
-            except socket.error, e:
-                LOG.info("Waiting for startup: ping got exception: %s %s" % (type(e), e))
+            except socket.error:
+                LOG.info("Waiting for startup: ping got exception")
                 LOG.info("pausing before retry")
                 time.sleep(STARTUP_BUSY_WAIT_INTERVAL_SEC)
 
@@ -251,8 +250,8 @@ class CoreNLP:
                 LOG.warning("Bad JSON length %d, starts with: %s" % (len(data), repr(data[:1000])))
                 return None
             return decoded
-        except socket.timeout, e:
-            LOG.info("Socket timeout happened, returning None: %s %s" % (type(e), e))
+        except socket.timeout:
+            LOG.info("Socket timeout happened, returning None:")
             return None
             # This is tricky. maybe the process is running smoothly but just
             # taking longer than we like.  if it's in thie state, and we try to
@@ -263,16 +262,17 @@ class CoreNLP:
         if self.comm_mode == 'SOCKET':
             sock = self.get_socket(num_retries=100)
             sock.settimeout(timeout)
-            sock.sendall(cmd + "\n")
+            sock.sendall((cmd + '\n'))
             size_info_str = sock.recv(8)
-        elif self.comm_mode == 'PIPE':
-            self.proc.stdin.write(cmd + "\n")
+        elif self.comm_mode == "PIPE":
+            self.proc.stdin.write((cmd + '\n'))
             self.proc.stdin.flush()
             size_info_str = self.outpipe_fp.read(8)
+            
 
         # java "long" is 8 bytes, which python struct calls "long long".
         # java default byte ordering is big-endian.
-        size_info = struct.unpack('>Q', size_info_str)[0]
+        size_info = struct.unpack('>Q', size_info_str.encode('latin-1'))[0]
         # print "size expected", size_info
 
         chunks = []
@@ -329,7 +329,7 @@ def test_paths():
 def assert_no_java(msg=""):
     ps_output = os.popen("ps wux").readlines()
     javalines = [x for x in ps_output if re.search(r'\bbin/java\b', x)]
-    print ''.join(javalines)
+    print (''.join(javalines))
     assert len(javalines) == 0, msg
 
 # def test_doctimeout():
@@ -345,8 +345,8 @@ if __name__=='__main__':
     import sys
     if sys.argv[1]=='modes':
         for mode,d in MODES_items:
-            print "  * `%s`: %s" % (mode, d['description'])
+            print ("  * `%s`: %s", mode, d['description'])
     if sys.argv[1]=='modes_json':
         # import json as stdjson
         # print stdjson.dumps(MODES, indent=4)
-        print '"%s"' % json.dumps(MODES).replace('"', r'\"')
+        print ('"%s"', json.dumps(MODES).replace('"', r'\"'))
