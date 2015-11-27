@@ -11,6 +11,8 @@ try:
 except ImportError:
     import json
 
+g_encoding = 'latin-1'
+
 # SUGGESTED: for constituent parsing models, specify shift-reduce parser in
 # configdict with:
 #  'parse.model': 'edu/stanford/nlp/models/srparser/englishSR.ser.gz'
@@ -127,7 +129,6 @@ class CoreNLP:
         if not self.configdict: self.configdict = {}
         self.configdict.update(more_configdict_args)
         if not self.configdict: self.configdict = None
-
         if self.comm_mode=='PIPE':
             tag = "pypid=%d_time=%s" % (os.getpid(), time.time())
             self.outpipe = "%s_%s" % (outpipe_filename_prefix, tag)
@@ -177,7 +178,7 @@ class CoreNLP:
             sock = self.get_socket(num_retries=100, retry_interval=STARTUP_BUSY_WAIT_INTERVAL_SEC)
             sock.close()
         elif self.comm_mode=='PIPE':
-            self.outpipe_fp = open(self.outpipe, 'r', encoding='latin-1')
+            self.outpipe_fp = open(self.outpipe, 'r', encoding=g_encoding)
 
         while True:
             # This loop is for if you have timeouts for the socket connection
@@ -272,7 +273,7 @@ class CoreNLP:
 
         # java "long" is 8 bytes, which python struct calls "long long".
         # java default byte ordering is big-endian.
-        size_info = struct.unpack('>Q', size_info_str.encode('latin-1'))[0]
+        size_info = struct.unpack('>Q', size_info_str.encode(g_encoding))[0]
         # print "size expected", size_info
 
         chunks = []
