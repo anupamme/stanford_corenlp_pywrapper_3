@@ -10,6 +10,8 @@ try:
     import ujson as json
 except ImportError:
     import json
+    
+import pdb
 
 g_encoding = 'latin-1'
 
@@ -269,8 +271,8 @@ class CoreNLP:
             self.proc.stdin.write((cmd + '\n'))
             self.proc.stdin.flush()
             size_info_str = self.outpipe_fp.read(8)
-            
-        size_info_str = size_info_str.replace('\n', '\r')
+        #pdb.set_trace()
+        #size_info_str = size_info_str.replace('\n', '\r')
 
         # java "long" is 8 bytes, which python struct calls "long long".
         # java default byte ordering is big-endian.
